@@ -113,7 +113,7 @@ textarea.input { resize: none; min-height: 70px; }
   box-shadow: 0 12px 34px color-mix(in srgb, var(--c) 45%, transparent), inset 0 -6px 14px rgba(0,0,0,.06);
   transition: transform .2s ease; position: relative;
 }
-.ping-btn svg { width: 74px; height: 74px; fill: var(--on-c); filter: drop-shadow(0 2px 4px rgba(0,0,0,.08)); }
+.ping-btn svg { width: 74px; height: 74px; fill: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,.08)); }
 .ping-btn::after {
   content: ''; position: absolute; inset: -10px; border-radius: 50%;
   border: 3px solid color-mix(in srgb, var(--c) 35%, transparent); animation: ring 2.6s ease-out infinite;
@@ -245,3 +245,7 @@ textarea.input { resize: none; min-height: 70px; }
 .auth .brand h1 { font-size: 38px; }
 .loading { min-height: 70dvh; display: grid; place-items: center; font-size: 46px; animation: beat 1.4s ease infinite; }
 .demo-tag { position: fixed; top: calc(var(--safe-t) + 8px); right: 10px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; z-index: 30; opacity: .75; }
+
+.editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; touch-action: none; }
+.editor-grid .trow { grid-template-columns: 40px 1fr; height: 22px; }
+.editor .cell.busy { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 80%, #000 5%); }

@@ -1,0 +1,50 @@
+// Collaudo completo con due telefoni simulati (Lay a Tokyo, Alma a Roma) contro gli emulatori.
+import { chromium } from 'playwright-core';
+const URL = 'http://localhost:8081/?emu';
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const errs = [];
+async function phone(tz, name) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, timezoneId: tz, locale: 'it-IT' });
+  const p = await ctx.newPage();
+  p.on('response', (r) => { if (r.status() >= 400) errs.push(name + ' ' + r.status() + ' ' + r.url().slice(0, 140)); });
+  p.on('pageerror', (e) => errs.push(`${name}: ${e.message}`));
+  p.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('CERT')) errs.push(`${name}: ${m.text()}`); });
+  await p.goto(URL); await p.waitForSelector('#auth-form');
+  await p.click('[data-mode=register]');
+  await p.fill('[name=name]', name); await p.fill('[name=email]', `${name.toLowerCase()}@test.it`); await p.fill('[name=pass]', 'segreto123');
+  await p.click('#auth-form button[type=submit]');
+  return p;
+}
+const lay = await phone('Asia/Tokyo', 'Lay');
+await lay.waitForSelector('#create'); await lay.click('#create');
+await lay.waitForSelector('.code');
+const code = (await lay.textContent('.code')).trim();
+console.log('codice:', code);
+const alma = await phone('Europe/Rome', 'Alma');
+await alma.waitForSelector('#join'); await alma.fill('[name=code]', code); await alma.click('#join button');
+await alma.waitForSelector('#ping', { timeout: 10000 });
+await lay.waitForSelector('#ping', { timeout: 10000 });
+console.log('coppia unita ✓');
+await alma.click('#ping'); await lay.waitForSelector('.received', { timeout: 10000 });
+console.log('ti penso ricevuto:', await lay.textContent('.received'));
+// Lay segna la notte
+await lay.click('[data-tab=orari]'); await lay.click('[data-sched=mine]'); await lay.click('[data-tool=night]');
+await lay.waitForFunction(() => document.querySelector('.saved')?.textContent.includes('Salvato'), null, { timeout: 10000 });
+console.log('orari salvati ✓');
+await lay.click('[data-sched=together]');
+await lay.click('.range [data-plan]'); await lay.click('#p-ok');
+await alma.waitForSelector('.next-call .pill', { timeout: 10000 });
+console.log('chiamata vista da Alma:', (await alma.textContent('.next-call .when')).trim());
+await alma.click('#pause'); await alma.click('#u-ok');
+await lay.click('[data-tab=home]');
+await lay.waitForSelector('.banner.partner', { timeout: 10000 });
+console.log('pausa vista da Lay:', (await lay.textContent('.banner.partner')).replace(/\s+/g, ' ').trim());
+await lay.click('#meeting'); await lay.fill('#m-date', '2026-12-20'); await lay.click('#m-ok');
+await alma.waitForFunction(() => document.querySelector('.big-num'), null, { timeout: 10000 });
+console.log('countdown Alma:', await alma.textContent('.big-num'));
+await alma.click('[data-tab=io]'); await alma.click('[data-color="#c39bf0"]');
+await lay.waitForTimeout(1000);
+console.log('colore Alma visto da Lay:', await lay.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--p')));
+await lay.screenshot({ path: process.env.OUT + '/e2e-lay.png', fullPage: true });
+console.log('errori:', errs);
+await browser.close();

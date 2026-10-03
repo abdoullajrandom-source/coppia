@@ -1,16 +1,17 @@
 {
   "name": "coppia",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "vendor": "esbuild scripts/firebase-entry.js --bundle --format=esm --minify --outfile=public/vendor/firebase.js",
+    "icons": "node scripts/icons.mjs",
+    "start": "python3 -m http.server 8081 -d public"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "esbuild": "^0.28.2",
-    "firebase": "^12.19.0"
-  }
+    "firebase": "^12.19.0",
+    "firebase-tools": "^15.32.1",
+    "playwright-core": "^1.63.0"
+  },
+  "private": true
 }

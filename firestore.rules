@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function isMember(cid) {
+      return signedIn() && me() in get(/databases/$(database)/documents/couples/$(cid)).data.members;
+    }
+
+    // Ogni persona vede e modifica solo il proprio documento (a quale coppia appartiene).
+    match /users/{uid} {
+      allow read, write: if signedIn() && me() == uid;
+    }
+
+    // Codici di invito: si possono leggere solo conoscendo il codice esatto.
+    match /codes/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['coupleId', 'by'])
+        && request.resource.data.by == me()
+        && get(/databases/$(database)/documents/couples/$(request.resource.data.coupleId)).data.members == [me()];
+    }
+
+    match /couples/{cid} {
+      allow get: if signedIn() && me() in resource.data.members;
+      allow create: if signedIn() && request.resource.data.members == [me()];
+      allow update: if signedIn() && (
+        // chi è già nella coppia può modificare tutto tranne i membri
+        (me() in resource.data.members && request.resource.data.members == resource.data.members)
+        // chi entra con il codice può solo aggiungersi, e al massimo si è in due
+        || (!(me() in resource.data.members)
+            && resource.data.members.size() == 1
+            && request.resource.data.members == resource.data.members.concat([me()])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']))
+      );
+
+      match /profiles/{uid} {
+        allow read: if isMember(cid);
+        allow write: if isMember(cid) && me() == uid;
+      }
+      match /calls/{id} {
+        allow read, create, update, delete: if isMember(cid);
+      }
+      match /notifs/{id} {
+        allow read: if isMember(cid);
+        allow create: if isMember(cid) && request.resource.data.from == me();
+      }
+    }
+  }
+}

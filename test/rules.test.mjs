@@ -1,0 +1,42 @@
+// Collaudo delle regole Firestore: npx firebase emulators:exec --only firestore "node test/rules.test.mjs"
+import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
+import { readFileSync } from 'node:fs';
+import { doc, getDoc, setDoc, updateDoc, addDoc, collection, arrayUnion, getDocs, query, where, deleteDoc } from 'firebase/firestore';
+
+const env = await initializeTestEnvironment({ projectId: 'demo-coppia', firestore: { rules: readFileSync('firestore.rules', 'utf8') } });
+const lay = env.authenticatedContext('lay').firestore();
+const alma = env.authenticatedContext('alma').firestore();
+const eve = env.authenticatedContext('eve').firestore();
+const anon = env.unauthenticatedContext().firestore();
+let n = 0; const ok = async (p, label) => { await assertSucceeds(p); n++; console.log('✓', label); };
+const no = async (p, label) => { await assertFails(p); n++; console.log('✓ (bloccato)', label); };
+
+await ok(setDoc(doc(lay, 'couples/c1'), { members: ['lay'], meeting: null }), 'Lay crea la coppia');
+await no(setDoc(doc(eve, 'couples/c2'), { members: ['eve', 'lay'] }), 'non si crea una coppia con altri dentro');
+await ok(setDoc(doc(lay, 'codes/ABC123'), { coupleId: 'c1', by: 'lay' }), 'Lay crea il codice');
+await no(setDoc(doc(eve, 'codes/EVE111'), { coupleId: 'c1', by: 'eve' }), 'altri non creano codici per la coppia');
+await ok(updateDoc(doc(lay, 'couples/c1'), { code: 'ABC123' }), 'Lay salva il codice');
+await ok(setDoc(doc(lay, 'couples/c1/profiles/lay'), { name: 'Lay' }), 'Lay crea il profilo');
+await no(getDoc(doc(anon, 'codes/ABC123')), 'senza account non si legge il codice');
+await ok(getDoc(doc(alma, 'codes/ABC123')), 'Alma legge il codice');
+await no(getDoc(doc(alma, 'couples/c1')), 'Alma non vede la coppia prima di entrare');
+await no(updateDoc(doc(alma, 'couples/c1'), { members: arrayUnion('alma'), meeting: { date: 'x' } }), 'entrando non si modifica altro');
+await ok(updateDoc(doc(alma, 'couples/c1'), { members: arrayUnion('alma') }), 'Alma entra con il codice');
+await no(updateDoc(doc(eve, 'couples/c1'), { members: arrayUnion('eve') }), 'una terza persona non può entrare');
+await ok(getDoc(doc(alma, 'couples/c1')), 'Alma vede la coppia');
+await ok(setDoc(doc(alma, 'couples/c1/profiles/alma'), { name: 'Alma' }), 'Alma crea il profilo');
+await no(updateDoc(doc(alma, 'couples/c1/profiles/lay'), { name: 'x' }), 'Alma non modifica il profilo di Lay');
+await ok(getDoc(doc(alma, 'couples/c1/profiles/lay')), 'Alma legge il profilo di Lay');
+await no(getDoc(doc(eve, 'couples/c1/profiles/lay')), 'estranei non leggono i profili');
+await no(updateDoc(doc(lay, 'couples/c1'), { members: ['lay'] }), 'nessuno toglie l\'altro dalla coppia');
+await ok(updateDoc(doc(lay, 'couples/c1'), { meeting: { date: '2026-11-10' } }), 'Lay imposta l\'incontro');
+await ok(addDoc(collection(alma, 'couples/c1/notifs'), { from: 'alma', to: 'lay', kind: 'ping' }), 'Alma manda un ti penso');
+await no(addDoc(collection(alma, 'couples/c1/notifs'), { from: 'lay', to: 'alma', kind: 'ping' }), 'non si manda a nome dell\'altro');
+await no(addDoc(collection(eve, 'couples/c1/notifs'), { from: 'eve', to: 'lay', kind: 'ping' }), 'estranei non mandano notifiche');
+await ok(getDocs(query(collection(lay, 'couples/c1/notifs'), where('kind', '==', 'ping'))), 'Lay legge le notifiche');
+await ok(addDoc(collection(lay, 'couples/c1/calls'), { start: 1, duration: 60 }), 'Lay fissa una chiamata');
+await no(getDocs(collection(eve, 'couples/c1/calls')), 'estranei non vedono le chiamate');
+await ok(setDoc(doc(lay, 'users/lay'), { coupleId: 'c1' }), 'Lay salva il proprio utente');
+await no(getDoc(doc(alma, 'users/lay')), 'nessuno legge l\'utente altrui');
+console.log(`\n${n} controlli superati`);
+await env.cleanup();
