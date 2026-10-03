@@ -13,8 +13,9 @@ export const state = {
 export function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 function emit() { for (const fn of listeners) fn(state); }
 
-const isPlaceholder = firebaseConfig.apiKey.startsWith('INSERISCI');
-const forceDemo = new URLSearchParams(location.search).has('anteprima');
+const params = new URLSearchParams(location.search);
+const isPlaceholder = firebaseConfig.apiKey.startsWith('INSERISCI') && !params.has('emu');
+const forceDemo = params.has('anteprima');
 state.demo = isPlaceholder || forceDemo;
 
 const SWEET = [
@@ -47,10 +48,16 @@ let api;
 // ---------------------------------------------------------------------------
 async function firebaseApi() {
   const fb = await import('../vendor/firebase.js');
-  const app = fb.initializeApp(firebaseConfig);
+  const emu = location.hostname === 'localhost' && params.has('emu');
+  const app = fb.initializeApp(emu ? { ...firebaseConfig, apiKey: 'emu', projectId: 'demo-coppia' } : firebaseConfig);
   const auth = fb.getAuth(app);
   await fb.setPersistence(auth, fb.browserLocalPersistence);
   const db = fb.getFirestore(app);
+  if (emu) {
+    // Solo per i collaudi in locale con gli emulatori Firebase.
+    fb.connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+    fb.connectFirestoreEmulator(db, 'localhost', 8080);
+  }
   let unsubs = [];
   const clearSubs = () => { unsubs.forEach((u) => u()); unsubs = []; };
 
@@ -202,7 +209,7 @@ function demoApi() {
   state.user = { uid: 'me', email: 'anteprima@coppia' };
   state.coupleId = 'demo';
   state.me = { id: 'me', ...defaultProfile(meTz === 'Asia/Tokyo' ? 'Lay' : 'Alma', meTz), busy: weekBusy(18, 38) };
-  state.partner = { id: 'partner', ...defaultProfile(meTz === 'Asia/Tokyo' ? 'Alma' : 'Lay', partnerTz), busy: weekBusy(17, 36) };
+  state.partner = { id: 'partner', ...defaultProfile(meTz === 'Asia/Tokyo' ? 'Alma' : 'Lay', partnerTz), busy: weekBusy(16, 28) };
   const in10 = new Date(); in10.setDate(in10.getDate() + 38);
   state.couple = { code: 'AB12CD', members: ['me', 'partner'], meeting: { date: in10.toISOString().slice(0, 10), note: 'Ci vediamo a Tokyo' } };
   state.calls = [];
