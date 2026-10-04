@@ -1,6 +1,6 @@
 // Service worker: rende l'app installabile e utilizzabile anche con rete lenta,
 // e mostra le notifiche push ("ti penso", pause, chiamate).
-const CACHE = 'coppia-v1';
+const CACHE = 'coppia-v2';
 const SHELL = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'js/app.js', 'js/store.js', 'js/tz.js',
   'js/config.js', 'vendor/firebase.js', 'icons/icon-192.png'];
 
