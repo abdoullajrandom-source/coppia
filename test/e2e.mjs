@@ -9,7 +9,7 @@ async function phone(tz, name) {
   p.on('response', (r) => { if (r.status() >= 400) errs.push(name + ' ' + r.status() + ' ' + r.url().slice(0, 140)); });
   p.on('pageerror', (e) => errs.push(`${name}: ${e.message}`));
   p.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('CERT')) errs.push(`${name}: ${m.text()}`); });
-  await p.goto(URL); await p.waitForSelector('#auth-form');
+  await p.goto(URL, { waitUntil: 'domcontentloaded' }); await p.waitForSelector('#auth-form');
   await p.click('[data-mode=register]');
   await p.fill('[name=name]', name); await p.fill('[name=email]', `${name.toLowerCase()}@test.it`); await p.fill('[name=pass]', 'segreto123');
   await p.click('#auth-form button[type=submit]');
