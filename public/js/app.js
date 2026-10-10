@@ -760,5 +760,15 @@ document.addEventListener('focusout', () => { if (pendingRender) { pendingRender
 setInterval(() => { if (ui.tab === 'home' && !$modal.innerHTML) render(); }, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
 
-if ('serviceWorker' in navigator && !state.demo) navigator.serviceWorker.register('sw.js').catch(console.error);
+if ('serviceWorker' in navigator && !state.demo) {
+  // Quando arriva una nuova versione dell'app, il service worker si aggiorna e la pagina si ricarica da sola.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !reloading) { reloading = true; location.reload(); }
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+    .then((reg) => { reg.update(); document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update(); }); })
+    .catch(console.error);
+}
 init();

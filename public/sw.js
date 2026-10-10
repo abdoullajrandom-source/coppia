@@ -1,6 +1,6 @@
 // Service worker: rende l'app installabile e utilizzabile anche con rete lenta,
 // e mostra le notifiche push ("ti penso", pause, chiamate).
-const CACHE = 'coppia-v4';
+const CACHE = 'coppia-v5';
 const SHELL = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'js/app.js', 'js/store.js', 'js/tz.js',
   'js/config.js', 'vendor/firebase.js', 'icons/icon-192.png'];
 
@@ -17,7 +17,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
-  e.respondWith(fetch(e.request).then((res) => {
+  // cache: 'no-cache' scavalca la cache HTTP di GitHub Pages (10 minuti), così le novità arrivano subito.
+  e.respondWith(fetch(new Request(e.request.url, { cache: 'no-cache', credentials: 'same-origin' })).then((res) => {
     const copy = res.clone();
     caches.open(CACHE).then((c) => c.put(e.request, copy));
     return res;
