@@ -33,8 +33,15 @@ function defaultProfile(name, tz) {
   return {
     name: name || 'Io', tz,
     color: tz === 'Asia/Tokyo' ? DEFAULT_COLORS.yellow : DEFAULT_COLORS.pink,
+    symbol: tz === 'Asia/Tokyo' ? '☯️' : '🌀',
     busy, pause: { active: false }, tokens: [],
   };
+}
+
+// Simbolo personale (Lay: yin e yang, Alma: spirale), modificabile nelle impostazioni.
+export function symbolOf(p) {
+  if (!p) return '';
+  return p.symbol || (p.tz === 'Asia/Tokyo' ? '☯️' : '🌀');
 }
 
 export function pauseActive(p) {
@@ -151,7 +158,7 @@ async function firebaseApi() {
     async updateProfile(patch) { await fb.updateDoc(profileRef(), patch); },
 
     async sendPing() {
-      await notify('ping', `${state.me.name} ti sta pensando 💗`, pick(SWEET));
+      await notify('ping', `${state.me.name} ${symbolOf(state.me)} ti sta pensando 💗`, pick(SWEET));
     },
     async setPause(until, message) {
       await fb.updateDoc(profileRef(), { pause: { active: true, until, message: message || '', since: Date.now() } });
@@ -178,6 +185,15 @@ async function firebaseApi() {
     async setMeeting(date, note) {
       await fb.updateDoc(fb.doc(db, 'couples', state.coupleId), { meeting: date ? { date, note: note || '' } : null });
       if (date) await notify('meeting', 'Il prossimo incontro ✈️', `${state.me.name} ha aggiornato la data: ${date.split('-').reverse().join('/')}.`);
+    },
+
+    // Le proposte stanno nel documento della coppia (campo "ideas"), visibili a entrambi.
+    async addIdea(text) {
+      const idea = { id: crypto.randomUUID(), text, by: uid(), at: Date.now() };
+      await fb.updateDoc(fb.doc(db, 'couples', state.coupleId), { ideas: fb.arrayUnion(idea) });
+    },
+    async deleteIdea(idea) {
+      await fb.updateDoc(fb.doc(db, 'couples', state.coupleId), { ideas: fb.arrayRemove(idea) });
     },
 
     async enableNotifications() {
@@ -228,6 +244,8 @@ function demoApi() {
     async addCall(start, duration, note) { state.calls.push({ id: id(), start, duration, note, by: 'me' }); state.calls.sort((a, b) => a.start - b.start); later(); },
     async deleteCall(call) { state.calls = state.calls.filter((c) => c.id !== call.id); later(); },
     async setMeeting(date, note) { state.couple.meeting = date ? { date, note } : null; later(); },
+    async addIdea(text) { state.couple.ideas = [...(state.couple.ideas || []), { id: id(), text, by: 'me', at: Date.now() }]; later(); },
+    async deleteIdea(idea) { state.couple.ideas = (state.couple.ideas || []).filter((i) => i.id !== idea.id); later(); },
     async enableNotifications() { throw new Error('demo'); },
   };
 }

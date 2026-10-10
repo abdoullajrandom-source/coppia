@@ -1,4 +1,4 @@
-import { state, subscribe, init, actions, pauseActive, DEFAULT_COLORS } from './store.js';
+import { state, subscribe, init, actions, pauseActive, symbolOf, DEFAULT_COLORS } from './store.js';
 import {
   SLOTS, DAY_NAMES, DAY_SHORT, MONTHS, TIMEZONES, wall, zoned, hhmm, pad, slotLabel, nextDays, daySlots,
   freeRanges, formatDayLong, formatDateTime, relative, daysUntil, emptyDay,
@@ -41,7 +41,7 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2600);
 }
 function hearts(x, y) {
-  const set = ['💗', '💕', '💖', '💞', '🩷', '💛'];
+  const set = ['💗', symbolOf(state.me) || '💕', '💖', '💞', '🩷', '💛'];
   for (let i = 0; i < 9; i++) {
     const h = document.createElement('div');
     h.className = 'float-heart';
@@ -184,7 +184,7 @@ function renderHome() {
   const me = state.me, partner = state.partner;
   const now = new Date();
   const wm = wall(now, me.tz);
-  let html = `<header class="hello"><div><p class="eyebrow">Ciao ${esc(me.name)}</p><h1>${greeting(wm.h)}</h1></div><span class="logo-hearts">💞</span></header>`;
+  let html = `<header class="hello"><div><p class="eyebrow">Ciao ${esc(me.name)}</p><h1>${greeting(wm.h)}</h1></div><span class="logo-hearts">${symbolOf(me)}${partner ? symbolOf(partner) : ''}</span></header>`;
 
   html += renderInstallBanner();
 
@@ -200,9 +200,9 @@ function renderHome() {
 
   const wp = wall(now, partner.tz);
   html += `<section class="card clocks">
-    <div class="clock me"><div class="who">Da te</div><div class="time">${pad(wm.h)}:${pad(wm.min)}</div><div class="day">${dayIcon(wm.h)} ${DAY_SHORT[wm.wd]} ${wm.d}</div></div>
+    <div class="clock me"><div class="who">Da te ${symbolOf(me)}</div><div class="time">${pad(wm.h)}:${pad(wm.min)}</div><div class="day">${dayIcon(wm.h)} ${DAY_SHORT[wm.wd]} ${wm.d}</div></div>
     <div class="between">🤍</div>
-    <div class="clock partner"><div class="who">Da ${esc(partner.name)}</div><div class="time">${pad(wp.h)}:${pad(wp.min)}</div><div class="day">${dayIcon(wp.h)} ${DAY_SHORT[wp.wd]} ${wp.d}</div></div>
+    <div class="clock partner"><div class="who">Da ${esc(partner.name)} ${symbolOf(partner)}</div><div class="time">${pad(wp.h)}:${pad(wp.min)}</div><div class="day">${dayIcon(wp.h)} ${DAY_SHORT[wp.wd]} ${wp.d}</div></div>
   </section>`;
 
   if (pauseActive(partner)) {
@@ -258,6 +258,7 @@ function renderHome() {
         <p class="muted small">Hai bisogno di un po' di spazio? Fallo sapere con dolcezza e di' quando tornerai.</p>
         <button class="btn line block" id="pause" style="margin-top:12px">Mi prendo un momento</button>
       </section>`;
+  html += `<p class="center" style="margin-top:4px"><button class="link small" data-ideas>💡 Proposte e suggerimenti</button></p>`;
   return html;
 }
 
@@ -483,6 +484,7 @@ function bindEditor() {
 // ---------------------------------------------------------------------------
 // Io (impostazioni)
 // ---------------------------------------------------------------------------
+const SYMBOLS = ['☯️', '🌀', '🌙', '⭐', '🌸', '🦋', '🍀', '🌊'];
 const PRESETS = ['#f48fb1', '#f6c445', '#ff9e80', '#c39bf0', '#8fd3b6', '#8fb8f4', '#e57373', '#b08968'];
 
 function renderIo() {
@@ -495,7 +497,7 @@ function renderIo() {
   else if (pushOn) notif = '<p class="small">Attive ✓ Riceverai i “ti penso” anche ad app chiusa.</p><button class="btn ghost small" id="push" style="margin-top:6px">Riattiva su questo telefono</button>';
   else notif = '<p class="small muted">Servono per sentire vibrare il telefono quando arriva un “ti penso”.</p><button class="btn block" id="push" style="margin-top:10px">Attiva le notifiche</button>';
 
-  return `<header class="hello"><div><p class="eyebrow">Le tue preferenze</p><h1>Io</h1></div><span class="logo-hearts">🎀</span></header>
+  return `<header class="hello"><div><p class="eyebrow">Le tue preferenze</p><h1>Io</h1></div><span class="logo-hearts">${symbolOf(me)}</span></header>
     <section class="card">
       <label class="field"><span>Il tuo nome</span><input class="input" id="name" value="${esc(me.name)}" maxlength="30"></label>
       <label class="field" style="margin-bottom:0"><span>Dove ti trovi</span>
@@ -509,6 +511,17 @@ function renderIo() {
         <label class="swatch custom ${custom ? 'on' : ''}" aria-label="Scegli un colore"><input type="color" id="color" value="${esc(me.color)}"></label>
       </div>
       <p class="tiny muted" style="margin-top:10px">L'app si colora con il tuo colore; quello di ${esc(partnerName())} compare dove ci sono i suoi orari.</p>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2><span class="emoji">${symbolOf(me)}</span> Il tuo simbolo</h2></div>
+      <div class="chips">${SYMBOLS.map((x) => `<button class="chip symbol ${x === symbolOf(me) ? 'on' : ''}" data-symbol="${x}">${x}</button>`).join('')}</div>
+      <label class="field" style="margin:12px 0 0"><span>Oppure scrivi un'emoji</span><input class="input" id="symbol" maxlength="8" value="${SYMBOLS.includes(symbolOf(me)) ? '' : esc(symbolOf(me))}" placeholder="Es. 🌻"></label>
+      <p class="tiny muted" style="margin-top:10px">Compare accanto al tuo nome e nei tuoi “ti penso”.</p>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2><span class="emoji">💡</span> Proposte e suggerimenti</h2></div>
+      <p class="small muted">Un'idea per migliorare l'app? Scrivila qui, la vedete entrambi.</p>
+      <button class="btn soft block" data-ideas style="margin-top:12px">Apri le proposte${(state.couple?.ideas || []).length ? ` (${state.couple.ideas.length})` : ''}</button>
     </section>
     <section class="card">
       <div class="card-head"><h2><span class="emoji">🔔</span> Notifiche</h2></div>
@@ -637,6 +650,50 @@ function openMeeting() {
   });
 }
 
+function ideaList() {
+  const ideas = [...(state.couple?.ideas || [])].sort((a, b) => b.at - a.at);
+  if (!ideas.length) return '<p class="muted small center">Ancora nessuna proposta.</p>';
+  const who = (uid) => (uid === state.me.id ? state.me : state.partner);
+  return ideas.map((i) => {
+    const p = who(i.by);
+    const d = new Date(i.at);
+    return `<div class="idea"><div class="idea-head"><span>${symbolOf(p)} <b>${esc(p?.name || '')}</b> · <span class="muted">${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}</span></span>
+      ${i.by === state.me.id ? `<button class="btn ghost small" data-del-idea="${esc(i.id)}">Elimina</button>` : ''}</div>
+      <p class="small">${esc(i.text).replace(/\n/g, '<br>')}</p></div>`;
+  }).join('');
+}
+
+function openIdeas() {
+  openModal(`<h2>Proposte e suggerimenti 💡</h2>
+    <p class="muted small" style="margin-bottom:12px">Cosa vorreste aggiungere o cambiare nell'app? Le leggerete insieme.</p>
+    <textarea class="input" id="i-text" maxlength="600" placeholder="Es. vorrei poter mandare anche un “buonanotte” 🌙"></textarea>
+    <div class="actions" style="margin-top:10px"><button class="btn" id="i-add">Aggiungi</button></div>
+    <div id="i-list" style="margin-top:18px">${ideaList()}</div>
+    <div class="actions"><button class="btn line small" id="i-copy">Copia tutte</button><button class="btn line small" data-dismiss>Chiudi</button></div>`,
+  (sheet) => {
+    const refresh = () => {
+      sheet.querySelector('#i-list').innerHTML = ideaList();
+      sheet.querySelectorAll('[data-del-idea]').forEach((b) => b.addEventListener('click', async () => {
+        const idea = (state.couple.ideas || []).find((i) => i.id === b.dataset.delIdea);
+        if (idea && await run(() => actions.deleteIdea(idea))) setTimeout(refresh, 300);
+      }));
+    };
+    refresh();
+    sheet.querySelector('#i-add').addEventListener('click', async () => {
+      const ta = sheet.querySelector('#i-text');
+      const text = ta.value.trim();
+      if (!text) { toast('Scrivi prima la tua proposta'); return; }
+      if (await run(() => actions.addIdea(text), 'Proposta aggiunta 💡')) { ta.value = ''; setTimeout(refresh, 300); }
+    });
+    sheet.querySelector('#i-copy').addEventListener('click', async () => {
+      const ideas = [...(state.couple?.ideas || [])].sort((a, b) => a.at - b.at);
+      const text = ideas.map((i) => `- ${(i.by === state.me.id ? state.me : state.partner)?.name}: ${i.text}`).join('\n');
+      try { await navigator.clipboard.writeText(text || 'Nessuna proposta'); toast('Copiate! Incollale pure a Claude'); }
+      catch { toast('Non riesco a copiare su questo telefono'); }
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Eventi
 // ---------------------------------------------------------------------------
@@ -689,6 +746,9 @@ function bindMain() {
       toast(e.message === 'denied' ? 'Permesso negato: abilitale dalle impostazioni del telefono.' : e.message === 'unsupported' ? 'Questo browser non supporta le notifiche.' : 'Non sono riuscito ad attivarle, riprova.');
     }
   });
+  $app.querySelectorAll('[data-ideas]').forEach((b) => b.addEventListener('click', openIdeas));
+  $app.querySelectorAll('[data-symbol]').forEach((b) => b.addEventListener('click', () => run(() => actions.updateProfile({ symbol: b.dataset.symbol }))));
+  $app.querySelector('#symbol')?.addEventListener('change', (e) => { const v = e.target.value.trim(); if (v) run(() => actions.updateProfile({ symbol: v }), 'Simbolo aggiornato'); });
   $app.querySelector('#logout')?.addEventListener('click', () => actions.logout());
 }
 
