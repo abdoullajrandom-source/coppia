@@ -528,16 +528,6 @@ function renderIo() {
       ${notif}
     </section>
     <section class="card">
-      <div class="card-head"><h2><span class="emoji">🤝</span> I nostri patti</h2></div>
-      <ul class="rules small">
-        <li>Il “ti penso” è un regalo, non una domanda: <b>non serve rispondere</b>.</li>
-        <li>Qui nessuno vede quando l'altro è online o se ha letto qualcosa.</li>
-        <li>Le ore occupate non hanno bisogno di spiegazioni.</li>
-        <li>Se una chiamata salta: una riga per avvisare e una nuova data, appena possibile.</li>
-        <li>Una pausa dice sempre quando si torna.</li>
-      </ul>
-    </section>
-    <section class="card">
       <div class="card-head"><h2><span class="emoji">💌</span> Codice della coppia</h2></div>
       <div class="code">${esc(state.couple?.code || '—')}</div>
       <p class="tiny muted" style="margin-top:8px">Serve solo per collegare il secondo telefono.</p>
