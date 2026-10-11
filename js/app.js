@@ -6,7 +6,8 @@ import {
 
 const $app = document.getElementById('app');
 const $modal = document.getElementById('modal');
-const ui = { dayView: (() => { try { return localStorage.getItem('coppia-dayview') || 'compact'; } catch { return 'compact'; } })(), tab: 'home', sched: 'together', dayIdx: 0, editDay: null, authMode: 'login', authError: '', busyOp: false };
+const stored = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
+const ui = { dayView: stored('coppia-dayview', 'compact'), dayWho: stored('coppia-daywho', 'both'), tab: 'home', sched: 'together', dayIdx: 0, editDay: null, authMode: 'login', authError: '', busyOp: false };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-10-9.4C.3 8.3 2.2 4 6.3 4c2.2 0 3.7 1.3 4.7 2.8C12 5.3 13.5 4 15.7 4 19.8 4 21.7 8.3 20 11.6 17.5 16.4 12 21 12 21z"/></svg>';
@@ -28,6 +29,7 @@ function applyColors() {
   root.setProperty('--c', c);
   root.setProperty('--p', p);
   root.setProperty('--on-c', luminance(c) > 0.45 ? '#45343a' : '#ffffff');
+  root.setProperty('--on-p', luminance(p) > 0.45 ? '#45343a' : '#ffffff');
 }
 
 // ---------------------------------------------------------------------------
@@ -325,13 +327,19 @@ function renderTogether() {
     : '<p class="muted small">Nessun momento libero in comune in questo giorno 🥲</p>';
 
   const compact = ui.dayView === 'compact';
+  const who = ui.dayWho;
+  // "Insieme": ore libere comuni in grigio, ore occupate nel colore di chi è occupato (a righe se entrambi).
+  // "Tu" / partner: solo le ore occupate di quella persona; il resto in grigio.
+  const clsOf = (s) => (who === 'me' ? (s.meBusy ? 'me' : 'open')
+    : who === 'partner' ? (s.partnerBusy ? 'partner' : 'open')
+      : s.free ? 'free' : s.meBusy && s.partnerBusy ? 'both' : s.meBusy ? 'me' : 'partner');
   let rows = '';
   slots.forEach((s, idx) => {
-    const cls = s.free ? 'free' : s.meBusy && s.partnerBusy ? 'both' : s.meBusy ? 'me' : 'partner';
+    const cls = clsOf(s);
     const prev = slots[idx - 1], nxt = slots[idx + 1];
-    const start = s.free && !(prev && prev.free), end = s.free && !(nxt && nxt.free);
+    const start = !(prev && clsOf(prev) === cls), end = !(nxt && clsOf(nxt) === cls);
     const call = calls.find((c) => c.start >= s.at.getTime() && c.start < s.at.getTime() + 30 * 60000);
-    const text = s.free ? (start ? 'liberi insieme 💞' : '') : (prev && prevCls(prev) === cls) ? '' : cls === 'me' ? 'tu' : cls === 'partner' ? esc(partner.name) : '';
+    const text = cls === 'free' ? (start ? 'liberi insieme 💞' : '') : cls === 'open' || (prev && clsOf(prev) === cls) ? '' : cls === 'me' ? 'tu' : cls === 'partner' ? esc(partner.name) : 'entrambi';
     const half = s.i % 2 === 1;
     // In vista compatta le etichette compaiono ogni 2 ore e le celle non hanno testo.
     const showLab = compact ? s.i % 4 === 0 : !half;
@@ -342,13 +350,20 @@ function renderTogether() {
       <span class="lab r">${showLab ? hhmm(s.at, partner.tz) : ''}</span>
     </div>`;
   });
+  const legend = who === 'both'
+    ? `<span><i class="lg free"></i>Liberi insieme</span>
+        <span><i class="lg me"></i>Tu occupato/a</span>
+        <span><i class="lg partner"></i>${esc(partner.name)} occupato/a</span>
+        <span><i class="lg both"></i>Entrambi</span>`
+    : `<span><i class="lg ${who}"></i>${who === 'me' ? 'Tu occupato/a' : `${esc(partner.name)} occupato/a`}</span>
+        <span><i class="lg open"></i>${who === 'me' ? 'Tu libero/a' : `${esc(partner.name)} libero/a`}</span>`;
 
   const callsHtml = calls.length
     ? calls.map((c) => `<div class="call-item"><div class="ic">📹</div><div class="grow">
         <div style="font-weight:800">${formatDateTime(new Date(c.start), me.tz)}</div>
         <div class="small muted">per ${esc(partner.name)}: ${formatDateTime(new Date(c.start), partner.tz)} · ${c.duration} min${c.note ? ' · ' + esc(c.note) : ''}</div>
       </div><button class="btn ghost small" data-cancel="${c.id}">Sposta</button></div>`).join('')
-    : '<p class="muted small">Ancora nessuna. Tocca un momento colorato qui sopra per fissarne una.</p>';
+    : '<p class="muted small">Ancora nessuna. Tocca un momento libero insieme qui sopra per fissarne una.</p>';
 
   return `
     <section class="card">${week}</section>
@@ -358,11 +373,12 @@ function renderTogether() {
     </section>
     <section class="card">
       <div class="card-head"><h3>La nostra giornata</h3><button class="btn ghost small" data-dayview>${compact ? 'Dettaglio' : 'Compatta'}</button></div>
-      <div class="legend" style="margin-bottom:10px">
-        <span><i class="lg free"></i>Liberi insieme</span>
-        <span><i class="lg me"></i>Tu occupato/a</span>
-        <span><i class="lg partner"></i>${esc(partner.name)} occupato/a</span>
+      <div class="segmented mini">
+        <button data-daywho="both" class="${who === 'both' ? 'on' : ''}">Insieme</button>
+        <button data-daywho="me" class="${who === 'me' ? 'on' : ''}">Tu</button>
+        <button data-daywho="partner" class="${who === 'partner' ? 'on' : ''}">${esc(partner.name)}</button>
       </div>
+      <div class="legend" style="margin-bottom:10px">${legend}</div>
       <div class="legend tiny" style="justify-content:space-between;margin-bottom:12px"><span>Tua ora</span><span style="color:var(--p-ink)">Ora di ${esc(partner.name)}</span></div>
       <div class="timeline ${compact ? 'compact' : ''}">${rows}</div>
     </section>
@@ -371,7 +387,6 @@ function renderTogether() {
       ${callsHtml}
     </section>`;
 }
-function prevCls(s) { return s.free ? 'free' : s.meBusy && s.partnerBusy ? 'both' : s.meBusy ? 'me' : 'partner'; }
 
 // Bozza locale degli orari, salvata con un attimo di ritardo.
 let draft = null;
@@ -525,7 +540,7 @@ function renderIo() {
     <section class="card">
       <div class="card-head"><h2><span class="emoji">💡</span> Proposte e suggerimenti</h2></div>
       <p class="small muted">Un'idea per migliorare l'app? Scrivila qui, la vedete entrambi.</p>
-      <button class="btn soft block" data-ideas style="margin-top:12px">Apri le proposte${(state.couple?.ideas || []).length ? ` (${state.couple.ideas.length})` : ''}</button>
+      <button class="btn soft block" data-ideas style="margin-top:12px">Apri le proposte${(() => { const n = (state.couple?.ideas || []).filter((i) => !i.done).length; return n ? ` (${n})` : ''; })()}</button>
     </section>
     <section class="card">
       <div class="card-head"><h2><span class="emoji">🔔</span> Notifiche</h2></div>
@@ -645,16 +660,24 @@ function openMeeting() {
 }
 
 function ideaList() {
-  const ideas = [...(state.couple?.ideas || [])].sort((a, b) => b.at - a.at);
-  if (!ideas.length) return '<p class="muted small center">Ancora nessuna proposta.</p>';
+  const all = [...(state.couple?.ideas || [])].sort((a, b) => b.at - a.at);
+  if (!all.length) return '<p class="muted small center">Ancora nessuna proposta.</p>';
   const who = (uid) => (uid === state.me.id ? state.me : state.partner);
-  return ideas.map((i) => {
+  const card = (i) => {
     const p = who(i.by);
     const d = new Date(i.at);
-    return `<div class="idea"><div class="idea-head"><span>${symbolOf(p)} <b>${esc(p?.name || '')}</b> · <span class="muted">${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}</span></span>
-      ${i.by === state.me.id ? `<span><button class="btn ghost small" data-edit-idea="${esc(i.id)}">Modifica</button><button class="btn ghost small" data-del-idea="${esc(i.id)}">Elimina</button></span>` : ''}</div>
+    const mine = i.by === state.me.id;
+    const btns = i.done
+      ? `<button class="btn ghost small" data-undone-idea="${esc(i.id)}">Riapri</button>`
+      : `<button class="btn ghost small" data-done-idea="${esc(i.id)}">Fatta ✓</button>${mine ? `<button class="btn ghost small" data-edit-idea="${esc(i.id)}">Modifica</button>` : ''}`;
+    return `<div class="idea ${i.done ? 'done' : ''}"><div class="idea-head"><span>${symbolOf(p)} <b>${esc(p?.name || '')}</b> · <span class="muted">${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}</span></span>
+      <span>${btns}${mine ? `<button class="btn ghost small" data-del-idea="${esc(i.id)}">Elimina</button>` : ''}</span></div>
       <p class="small" data-idea-text="${esc(i.id)}">${esc(i.text).replace(/\n/g, '<br>')}</p></div>`;
-  }).join('');
+  };
+  const open = all.filter((i) => !i.done);
+  const done = all.filter((i) => i.done).sort((a, b) => b.done - a.done);
+  return (open.length ? open.map(card).join('') : '<p class="muted small center">Nessuna proposta in sospeso 🎉</p>')
+    + (done.length ? `<details class="ideas-done"><summary>Completate (${done.length})</summary>${done.map(card).join('')}</details>` : '');
 }
 
 function openIdeas() {
@@ -663,13 +686,18 @@ function openIdeas() {
     <textarea class="input" id="i-text" maxlength="600" placeholder="Es. vorrei poter mandare anche un “buonanotte” 🌙"></textarea>
     <div class="actions" style="margin-top:10px"><button class="btn" id="i-add">Aggiungi</button></div>
     <div id="i-list" style="margin-top:18px">${ideaList()}</div>
-    <div class="actions"><button class="btn line small" id="i-copy">Copia tutte</button><button class="btn line small" data-dismiss>Chiudi</button></div>`,
+    <div class="actions"><button class="btn line small" id="i-copy">Copia quelle da fare</button><button class="btn line small" data-dismiss>Chiudi</button></div>`,
   (sheet) => {
     const refresh = () => {
       sheet.querySelector('#i-list').innerHTML = ideaList();
       sheet.querySelectorAll('[data-del-idea]').forEach((b) => b.addEventListener('click', async () => {
         const idea = (state.couple.ideas || []).find((i) => i.id === b.dataset.delIdea);
         if (idea && await run(() => actions.deleteIdea(idea))) setTimeout(refresh, 300);
+      }));
+      sheet.querySelectorAll('[data-done-idea], [data-undone-idea]').forEach((b) => b.addEventListener('click', async () => {
+        const done = 'doneIdea' in b.dataset;
+        const idea = (state.couple.ideas || []).find((i) => i.id === (b.dataset.doneIdea || b.dataset.undoneIdea));
+        if (idea && await run(() => actions.setIdeaDone(idea, done), done ? 'Segnata come fatta ✓' : 'Proposta riaperta')) setTimeout(refresh, 300);
       }));
       sheet.querySelectorAll('[data-edit-idea]').forEach((b) => b.addEventListener('click', () => {
         const idea = (state.couple.ideas || []).find((i) => i.id === b.dataset.editIdea);
@@ -694,7 +722,7 @@ function openIdeas() {
       if (await run(() => actions.addIdea(text), 'Proposta aggiunta 💡')) { ta.value = ''; setTimeout(refresh, 300); }
     });
     sheet.querySelector('#i-copy').addEventListener('click', async () => {
-      const ideas = [...(state.couple?.ideas || [])].sort((a, b) => a.at - b.at);
+      const ideas = (state.couple?.ideas || []).filter((i) => !i.done).sort((a, b) => a.at - b.at);
       const text = ideas.map((i) => `- ${(i.by === state.me.id ? state.me : state.partner)?.name}: ${i.text}`).join('\n');
       try { await navigator.clipboard.writeText(text || 'Nessuna proposta'); toast('Copiate! Incollale pure a Claude'); }
       catch { toast('Non riesco a copiare su questo telefono'); }
@@ -739,6 +767,11 @@ function bindMain() {
     try { localStorage.setItem('coppia-dayview', ui.dayView); } catch {}
     render();
   });
+  $app.querySelectorAll('[data-daywho]').forEach((b) => b.addEventListener('click', () => {
+    ui.dayWho = b.dataset.daywho;
+    try { localStorage.setItem('coppia-daywho', ui.dayWho); } catch {}
+    render();
+  }));
   $app.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => { ui.dayIdx = +b.dataset.day; render(); }));
   $app.querySelectorAll('[data-plan]').forEach((b) => b.addEventListener('click', () => openPlan(b.dataset.plan, +(b.dataset.max || 120))));
   $app.querySelectorAll('[data-cancel]').forEach((b) => b.addEventListener('click', () => openCancel(state.calls.find((c) => c.id === b.dataset.cancel))));
