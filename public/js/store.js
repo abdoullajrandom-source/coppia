@@ -195,6 +195,10 @@ async function firebaseApi() {
     async deleteIdea(idea) {
       await fb.updateDoc(fb.doc(db, 'couples', state.coupleId), { ideas: fb.arrayRemove(idea) });
     },
+    async updateIdea(idea, text) {
+      const ideas = (state.couple?.ideas || []).map((i) => (i.id === idea.id ? { ...i, text, edited: Date.now() } : i));
+      await fb.updateDoc(fb.doc(db, 'couples', state.coupleId), { ideas });
+    },
 
     async enableNotifications() {
       if (!('Notification' in window) || !('serviceWorker' in navigator)) throw new Error('unsupported');
@@ -246,6 +250,7 @@ function demoApi() {
     async setMeeting(date, note) { state.couple.meeting = date ? { date, note } : null; later(); },
     async addIdea(text) { state.couple.ideas = [...(state.couple.ideas || []), { id: id(), text, by: 'me', at: Date.now() }]; later(); },
     async deleteIdea(idea) { state.couple.ideas = (state.couple.ideas || []).filter((i) => i.id !== idea.id); later(); },
+    async updateIdea(idea, text) { state.couple.ideas = (state.couple.ideas || []).map((i) => (i.id === idea.id ? { ...i, text } : i)); later(); },
     async enableNotifications() { throw new Error('demo'); },
   };
 }

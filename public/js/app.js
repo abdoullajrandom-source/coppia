@@ -6,7 +6,7 @@ import {
 
 const $app = document.getElementById('app');
 const $modal = document.getElementById('modal');
-const ui = { tab: 'home', sched: 'together', dayIdx: 0, editDay: null, authMode: 'login', authError: '', busyOp: false };
+const ui = { dayView: (() => { try { return localStorage.getItem('coppia-dayview') || 'compact'; } catch { return 'compact'; } })(), tab: 'home', sched: 'together', dayIdx: 0, editDay: null, authMode: 'login', authError: '', busyOp: false };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-10-9.4C.3 8.3 2.2 4 6.3 4c2.2 0 3.7 1.3 4.7 2.8C12 5.3 13.5 4 15.7 4 19.8 4 21.7 8.3 20 11.6 17.5 16.4 12 21 12 21z"/></svg>';
@@ -324,6 +324,7 @@ function renderTogether() {
     }).join('')
     : '<p class="muted small">Nessun momento libero in comune in questo giorno 🥲</p>';
 
+  const compact = ui.dayView === 'compact';
   let rows = '';
   slots.forEach((s, idx) => {
     const cls = s.free ? 'free' : s.meBusy && s.partnerBusy ? 'both' : s.meBusy ? 'me' : 'partner';
@@ -332,10 +333,13 @@ function renderTogether() {
     const call = calls.find((c) => c.start >= s.at.getTime() && c.start < s.at.getTime() + 30 * 60000);
     const text = s.free ? (start ? 'liberi insieme 💞' : '') : (prev && prevCls(prev) === cls) ? '' : cls === 'me' ? 'tu' : cls === 'partner' ? esc(partner.name) : '';
     const half = s.i % 2 === 1;
-    rows += `<div class="trow ${half ? 'half' : ''}">
-      <span class="lab">${half ? '' : slotLabel(s.i)}</span>
-      <div class="cell ${cls} ${start ? 'start' : ''} ${end ? 'end' : ''} ${s.past ? 'past' : ''}" ${s.free && !s.past ? `data-plan="${s.at.getTime()}"` : ''}>${text}${call ? `<span class="call-mark">📹 ${hhmm(new Date(call.start), me.tz)}</span>` : ''}</div>
-      <span class="lab r">${half ? '' : hhmm(s.at, partner.tz)}</span>
+    // In vista compatta le etichette compaiono ogni 2 ore e le celle non hanno testo.
+    const showLab = compact ? s.i % 4 === 0 : !half;
+    const mark = call ? (compact ? '<span class="call-dot">📹</span>' : `<span class="call-mark">📹 ${hhmm(new Date(call.start), me.tz)}</span>`) : '';
+    rows += `<div class="trow ${half ? 'half' : ''} ${compact && s.i % 4 ? 'quiet' : ''}">
+      <span class="lab">${showLab ? slotLabel(s.i) : ''}</span>
+      <div class="cell ${cls} ${start ? 'start' : ''} ${end ? 'end' : ''} ${s.past ? 'past' : ''}" ${s.free && !s.past ? `data-plan="${s.at.getTime()}"` : ''}>${compact ? '' : text}${mark}</div>
+      <span class="lab r">${showLab ? hhmm(s.at, partner.tz) : ''}</span>
     </div>`;
   });
 
@@ -353,14 +357,14 @@ function renderTogether() {
       <div class="ranges">${rangesHtml}</div>
     </section>
     <section class="card">
-      <div class="card-head"><h3>La giornata, ora per ora</h3></div>
+      <div class="card-head"><h3>La nostra giornata</h3><button class="btn ghost small" data-dayview>${compact ? 'Dettaglio' : 'Compatta'}</button></div>
       <div class="legend" style="margin-bottom:10px">
-        <span><i style="background:color-mix(in srgb,var(--c) 30%,#fff)"></i>Liberi insieme</span>
-        <span><i style="background:#f5ebe8"></i>Tu occupato/a</span>
-        <span><i style="background:color-mix(in srgb,var(--p) 18%,#fff)"></i>${esc(partner.name)} occupato/a</span>
+        <span><i class="lg free"></i>Liberi insieme</span>
+        <span><i class="lg me"></i>Tu occupato/a</span>
+        <span><i class="lg partner"></i>${esc(partner.name)} occupato/a</span>
       </div>
       <div class="legend tiny" style="justify-content:space-between;margin-bottom:12px"><span>Tua ora</span><span style="color:var(--p-ink)">Ora di ${esc(partner.name)}</span></div>
-      <div class="timeline">${rows}</div>
+      <div class="timeline ${compact ? 'compact' : ''}">${rows}</div>
     </section>
     <section class="card">
       <div class="card-head"><h2><span class="emoji">📹</span> Videochiamate in programma</h2></div>
@@ -648,8 +652,8 @@ function ideaList() {
     const p = who(i.by);
     const d = new Date(i.at);
     return `<div class="idea"><div class="idea-head"><span>${symbolOf(p)} <b>${esc(p?.name || '')}</b> · <span class="muted">${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}</span></span>
-      ${i.by === state.me.id ? `<button class="btn ghost small" data-del-idea="${esc(i.id)}">Elimina</button>` : ''}</div>
-      <p class="small">${esc(i.text).replace(/\n/g, '<br>')}</p></div>`;
+      ${i.by === state.me.id ? `<span><button class="btn ghost small" data-edit-idea="${esc(i.id)}">Modifica</button><button class="btn ghost small" data-del-idea="${esc(i.id)}">Elimina</button></span>` : ''}</div>
+      <p class="small" data-idea-text="${esc(i.id)}">${esc(i.text).replace(/\n/g, '<br>')}</p></div>`;
   }).join('');
 }
 
@@ -666,6 +670,20 @@ function openIdeas() {
       sheet.querySelectorAll('[data-del-idea]').forEach((b) => b.addEventListener('click', async () => {
         const idea = (state.couple.ideas || []).find((i) => i.id === b.dataset.delIdea);
         if (idea && await run(() => actions.deleteIdea(idea))) setTimeout(refresh, 300);
+      }));
+      sheet.querySelectorAll('[data-edit-idea]').forEach((b) => b.addEventListener('click', () => {
+        const idea = (state.couple.ideas || []).find((i) => i.id === b.dataset.editIdea);
+        const p = sheet.querySelector(`[data-idea-text="${CSS.escape(b.dataset.editIdea)}"]`);
+        if (!idea || !p) return;
+        p.outerHTML = `<div class="idea-edit"><textarea class="input" maxlength="600">${esc(idea.text)}</textarea>
+          <div class="actions" style="margin-top:8px"><button class="btn line small" data-cancel-edit>Annulla</button><button class="btn small" data-save-edit>Salva</button></div></div>`;
+        const box = b.closest('.idea').querySelector('.idea-edit');
+        box.querySelector('[data-cancel-edit]').addEventListener('click', refresh);
+        box.querySelector('[data-save-edit]').addEventListener('click', async () => {
+          const text = box.querySelector('textarea').value.trim();
+          if (!text) { toast('La proposta non può essere vuota'); return; }
+          if (await run(() => actions.updateIdea(idea, text), 'Proposta modificata')) setTimeout(refresh, 300);
+        });
       }));
     };
     refresh();
@@ -716,6 +734,11 @@ function bindMain() {
 
   // Orari
   $app.querySelectorAll('[data-sched]').forEach((b) => b.addEventListener('click', () => { ui.sched = b.dataset.sched; draft = null; render(); }));
+  $app.querySelector('[data-dayview]')?.addEventListener('click', () => {
+    ui.dayView = ui.dayView === 'compact' ? 'detail' : 'compact';
+    try { localStorage.setItem('coppia-dayview', ui.dayView); } catch {}
+    render();
+  });
   $app.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => { ui.dayIdx = +b.dataset.day; render(); }));
   $app.querySelectorAll('[data-plan]').forEach((b) => b.addEventListener('click', () => openPlan(b.dataset.plan, +(b.dataset.max || 120))));
   $app.querySelectorAll('[data-cancel]').forEach((b) => b.addEventListener('click', () => openCancel(state.calls.find((c) => c.id === b.dataset.cancel))));
