@@ -1,5 +1,10 @@
 # Storico modifiche
 
+## 2026-10-11 (sera)
+- La nostra giornata: selettore "Insieme · Tu · Alma" per vedere le ore occupate di una sola persona; la scelta viene ricordata sul telefono.
+- Nuovi colori della giornata: ore occupate nel colore di chi è occupato (il colore scelto da ciascuno), a righe oblique con i due colori se siete occupati entrambi; ore libere insieme in grigio.
+- Proposte e suggerimenti: tasto "Fatta ✓" (per entrambi) e gruppo "Completate", con "Riapri"; "Copia quelle da fare" copia solo le proposte aperte.
+
 ## 2026-10-11
 - Giornata condivisa più leggibile: momenti liberi a colore pieno, ore occupate in grigio, ore passate in grigio chiaro.
 - Vista compatta della giornata (tutte le 24 ore in uno schermo, orari ogni 2 ore) con tasto "Dettaglio"/"Compatta"; la scelta viene ricordata sul telefono.

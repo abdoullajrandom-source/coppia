@@ -199,6 +199,15 @@ async function firebaseApi() {
       const ideas = (state.couple?.ideas || []).map((i) => (i.id === idea.id ? { ...i, text, edited: Date.now() } : i));
       await fb.updateDoc(fb.doc(db, 'couples', state.coupleId), { ideas });
     },
+    // Segna una proposta come completata (o la riapre); possono farlo entrambi.
+    async setIdeaDone(idea, done) {
+      const ideas = (state.couple?.ideas || []).map((i) => {
+        if (i.id !== idea.id) return i;
+        const { done: _d, ...rest } = i;
+        return done ? { ...rest, done: Date.now() } : rest;
+      });
+      await fb.updateDoc(fb.doc(db, 'couples', state.coupleId), { ideas });
+    },
 
     async enableNotifications() {
       if (!('Notification' in window) || !('serviceWorker' in navigator)) throw new Error('unsupported');
@@ -251,6 +260,7 @@ function demoApi() {
     async addIdea(text) { state.couple.ideas = [...(state.couple.ideas || []), { id: id(), text, by: 'me', at: Date.now() }]; later(); },
     async deleteIdea(idea) { state.couple.ideas = (state.couple.ideas || []).filter((i) => i.id !== idea.id); later(); },
     async updateIdea(idea, text) { state.couple.ideas = (state.couple.ideas || []).map((i) => (i.id === idea.id ? { ...i, text } : i)); later(); },
+    async setIdeaDone(idea, done) { state.couple.ideas = (state.couple.ideas || []).map((i) => (i.id === idea.id ? { ...i, done: done ? Date.now() : undefined } : i)); later(); },
     async enableNotifications() { throw new Error('demo'); },
   };
 }
